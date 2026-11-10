@@ -1,85 +1,491 @@
-Build a complete, beginner-friendly, mobile-responsive web application called VOLCANO WATCH – Digital Seismograph Dashboard.
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#071426">
+<title>VOLCANO WATCH</title>
 
-This is a school science exhibition project. The application must use the Android tablet's BUILT-IN accelerometer. Do not require Arduino, external sensors, a laptop, or any additional hardware.
+<style>
+:root {
+  --bg: #071426;
+  --panel: #10233d;
+  --line: #24415f;
+  --text: #f3f7fb;
+  --muted: #a9bdd2;
+  --green: #36d399;
+  --yellow: #fbbf24;
+  --red: #fb7185;
+}
 
-1. Design
+* { box-sizing: border-box; }
 
-Create a modern scientific monitoring dashboard with:
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, sans-serif;
+}
 
-- Dark navy background.
-- Clean professional interface.
-- Green, yellow and red status indicators.
-- Large readable text suitable for displaying on a Samsung tablet.
-- Very few buttons. Do not create unnecessary menus or complicated settings.
+main {
+  max-width: 950px;
+  margin: auto;
+  padding: 20px;
+}
 
-2. Main controls
+h1 { font-size: 32px; }
 
-Only include:
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  padding: 18px;
+  margin: 15px 0;
+}
 
-- START MONITORING
-- STOP MONITORING
-- RESET
+.muted { color: var(--muted); }
 
-3. Live accelerometer readings
+.status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
-Use the browser's DeviceMotionEvent API to access the tablet's built-in motion sensor.
+.dot {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--green);
+}
 
-- Request motion sensor permission when necessary.
-- Read X, Y and Z acceleration.
-- Display live acceleration values.
-- Handle unsupported sensors and denied permissions with clear instructions.
-- Do not generate fake sensor readings.
+.status strong { font-size: 24px; }
 
-4. Live seismograph graph
+button {
+  border: 0;
+  border-radius: 9px;
+  padding: 14px 18px;
+  margin: 5px;
+  font-weight: bold;
+  font-size: 14px;
+  cursor: pointer;
+}
 
-Create a scrolling waveform graph showing vibration over time.
+#start { background: var(--green); color: #062017; }
+#stop { background: var(--yellow); color: #241700; }
+#reset { background: #29445f; color: white; }
 
-- Use real sensor readings.
-- Remove the gravity component or use linear acceleration when available.
-- Make the graph smooth and easy to understand.
-- Clearly label the vertical axis and time axis.
+button:disabled { opacity: 0.4; }
 
-5. Frequency calculation
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
 
-This is VERY IMPORTANT.
+.metric {
+  background: #091a2d;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px;
+}
 
-Calculate the dominant vibration frequency in Hertz (Hz) from actual sensor readings.
+.metric span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
 
-- Sample sensor data with timestamps.
-- Use an appropriate signal-processing method such as FFT or zero-crossing analysis.
-- Remove the baseline and gravity component before calculating frequency.
-- Display frequency in large text.
-- Display "Insufficient signal" when there is not enough reliable data.
-- Never invent or display random frequency values.
-- Explain that frequency estimates depend on the sensor's sampling rate and vibration quality.
+.metric b {
+  display: block;
+  font-size: 25px;
+  margin: 8px 0;
+}
 
-6. Warning dashboard
+canvas {
+  width: 100%;
+  height: 220px;
+  background: #061426;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
 
-Create three demonstration-only vibration states:
+.note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
 
-- GREEN: NORMAL
-- YELLOW: ELEVATED
-- RED: HIGH
+@media(max-width:600px) {
+  .metrics { grid-template-columns: 1fr; }
+  main { padding: 12px; }
+}
+</style>
+</head>
 
-Use calibrated vibration amplitude thresholds, not frequency alone, to determine these states.
+<body>
+<main>
 
-Clearly mention that these are experimental demonstration levels, NOT real volcanic eruption predictions.
+<header>
+  <h1>🌋 VOLCANO WATCH</h1>
+  <p class="muted">Digital Seismograph Dashboard</p>
+</header>
 
-7. Technical requirements
+<section class="panel">
+  <div class="status">
+    <div class="dot" id="dot"></div>
+    <div>
+      <div class="muted">DEMO STATUS</div>
+      <strong id="status">READY</strong>
+    </div>
+  </div>
 
-- Use plain HTML, CSS and JavaScript.
-- No complicated backend or database.
-- No login.
-- No paid APIs.
-- Must work on Android Chrome over HTTPS.
-- Make it responsive for Samsung Galaxy Tab A9+ and Samsung Galaxy Tab S6 Lite.
-- Include clear error handling.
-- Ask for sensor permission only after the user presses START MONITORING.
+  <p id="message" class="muted">
+    Place your tablet on a steady table.
+  </p>
 
-8. Final requirement
+  <button id="start">START MONITORING</button>
+  <button id="stop" disabled>STOP</button>
+  <button id="reset">RESET</button>
+</section>
 
-Build the complete working application, not just a design mockup.
+<section class="panel">
+  <h2>Live Vibration Graph</h2>
+  <canvas id="graph" width="900" height="220"></canvas>
+  <p class="note">Live acceleration changes over time.</p>
+</section>
 
-Test the sensor access and frequency calculation logic. Provide simple instructions explaining how to open the app on an Android tablet and test it using gentle table vibrations.
+<section class="panel">
+  <h2>Sensor Readings</h2>
 
-Make the interface extremely simple for a Class 10 science exhibition,.
+  <div class="metrics">
+    <div class="metric">
+      <span>X Acceleration</span>
+      <b id="x">—</b>
+      <span>m/s²</span>
+    </div>
+
+    <div class="metric">
+      <span>Y Acceleration</span>
+      <b id="y">—</b>
+      <span>m/s²</span>
+    </div>
+
+    <div class="metric">
+      <span>Z Acceleration</span>
+      <b id="z">—</b>
+      <span>m/s²</span>
+    </div>
+
+    <div class="metric">
+      <span>Vibration Level</span>
+      <b id="rms">—</b>
+      <span>RMS · m/s²</span>
+    </div>
+
+    <div class="metric">
+      <span>Estimated Frequency</span>
+      <b id="freq">—</b>
+      <span>Hz</span>
+    </div>
+
+    <div class="metric">
+      <span>Samples Received</span>
+      <b id="samples">0</b>
+      <span>Sensor events</span>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Scientific Explanation</h2>
+  <p class="note">
+    This prototype detects movement of the tablet.
+    It is not a calibrated seismometer and cannot
+    predict volcanic eruptions.
+    Green, yellow and red are classroom demonstration
+    levels only. Frequency is an approximate estimate.
+  </p>
+</section>
+
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const canvas = $("graph");
+const ctx = canvas.getContext("2d");
+
+let running = false;
+let count = 0;
+let values = [];
+let times = [];
+let handler = null;
+let baseline = {x:0,y:0,z:0};
+
+function setStatus(level, message, color) {
+  $("status").textContent = level;
+  $("message").textContent = message;
+  $("dot").style.background = color;
+}
+
+function drawGraph() {
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle = "#24415f";
+
+  for(let i=1;i<4;i++) {
+    ctx.beginPath();
+    ctx.moveTo(0,h*i/4);
+    ctx.lineTo(w,h*i/4);
+    ctx.stroke();
+  }
+
+  const arr = values.slice(-180);
+
+  if(!arr.length) return;
+
+  ctx.strokeStyle = "#36d399";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+
+  arr.forEach((v,i) => {
+    const x = i/(Math.max(1,arr.length-1))*w;
+    const y = h/2-v*35;
+
+    if(i===0) ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  });
+
+  ctx.stroke();
+}
+
+function estimateFrequency(a) {
+  if(a.length < 80) return null;
+
+  const mean = a.reduce((s,v)=>s+v,0)/a.length;
+  const d = a.map(v=>v-mean);
+
+  let bestLag = 0;
+  let best = -Infinity;
+
+  for(let lag=3;lag<=30;lag++) {
+    let sum=0, n=0;
+
+    for(let i=0;i<d.length-lag;i++) {
+      sum += d[i]*d[i+lag];
+      n++;
+    }
+
+    const score=sum/Math.max(1,n);
+
+    if(score>best) {
+      best=score;
+      bestLag=lag;
+    }
+  }
+
+  const energy=d.reduce((s,v)=>s+v*v,0)/d.length;
+
+  if(energy<0.0004 || bestLag===0 || best<=0)
+    return null;
+
+  const duration =
+    (times[times.length-1]-times[times.length-a.length])/1000;
+
+  if(duration<=0) return null;
+
+  const sampleRate=(a.length-1)/duration;
+  const frequency=sampleRate/bestLag;
+
+  return frequency>0.5 && frequency<20
+    ? frequency
+    : null;
+}
+
+function onMotion(e) {
+  const a=e.acceleration;
+  const g=e.accelerationIncludingGravity;
+
+  let x,y,z;
+
+  if(a && a.x!==null && a.y!==null && a.z!==null) {
+    x=a.x;
+    y=a.y;
+    z=a.z;
+  }
+  else if(g && g.x!==null && g.y!==null && g.z!==null) {
+    x=g.x-baseline.x;
+    y=g.y-baseline.y;
+    z=g.z-baseline.z;
+
+    baseline.x=baseline.x*0.92+g.x*0.08;
+    baseline.y=baseline.y*0.92+g.y*0.08;
+    baseline.z=baseline.z*0.92+g.z*0.08;
+  }
+  else {
+    setStatus(
+      "UNAVAILABLE",
+      "No acceleration readings received.",
+      "#fbbf24"
+    );
+    return;
+  }
+
+  const magnitude=Math.sqrt(x*x+y*y+z*z);
+
+  count++;
+  values.push(magnitude);
+  times.push(performance.now());
+
+  if(values.length>220) {
+    values.shift();
+    times.shift();
+  }
+
+  $("x").textContent=x.toFixed(2);
+  $("y").textContent=y.toFixed(2);
+  $("z").textContent=z.toFixed(2);
+  $("samples").textContent=count;
+
+  const recent=values.slice(-100);
+
+  const rms=Math.sqrt(
+    recent.reduce((s,v)=>s+v*v,0)/
+    Math.max(1,recent.length)
+  );
+
+  $("rms").textContent=rms.toFixed(3);
+
+  const frequency=estimateFrequency(values.slice(-160));
+
+  $("freq").textContent =
+    frequency===null
+      ? "Insufficient signal"
+      : frequency.toFixed(1);
+
+  if(rms>=1.2) {
+    setStatus(
+      "HIGH",
+      "Strong tablet movement detected. Demo level only.",
+      "#fb7185"
+    );
+  }
+  else if(rms>=0.35) {
+    setStatus(
+      "ELEVATED",
+      "Some movement detected. Demo level only.",
+      "#fbbf24"
+    );
+  }
+  else {
+    setStatus(
+      "NORMAL",
+      "Low movement detected.",
+      "#36d399"
+    );
+  }
+
+  drawGraph();
+}
+
+async function startMonitoring() {
+  if(running) return;
+
+  if(!("DeviceMotionEvent" in window)) {
+    setStatus(
+      "UNSUPPORTED",
+      "This browser does not support motion sensors.",
+      "#fbbf24"
+    );
+    return;
+  }
+
+  try {
+    if(typeof DeviceMotionEvent.requestPermission==="function") {
+      const permission =
+        await DeviceMotionEvent.requestPermission();
+
+      if(permission!=="granted") {
+        setStatus(
+          "PERMISSION NEEDED",
+          "Allow motion sensor permission in browser settings.",
+          "#fbbf24"
+        );
+        return;
+      }
+    }
+
+    count=0;
+    values=[];
+    times=[];
+    running=true;
+
+    handler=onMotion;
+    window.addEventListener("devicemotion",handler);
+
+    $("start").disabled=true;
+    $("stop").disabled=false;
+
+    setStatus(
+      "MONITORING",
+      "Collecting live tablet motion data.",
+      "#36d399"
+    );
+
+  } catch(error) {
+    setStatus(
+      "ERROR",
+      "Could not start the motion sensor.",
+      "#fbbf24"
+    );
+  }
+}
+
+function stopMonitoring() {
+  if(handler) {
+    window.removeEventListener("devicemotion",handler);
+  }
+
+  handler=null;
+  running=false;
+
+  $("start").disabled=false;
+  $("stop").disabled=true;
+
+  if($("status").textContent==="MONITORING") {
+    setStatus("STOPPED","Monitoring stopped.","#fbbf24");
+  }
+}
+
+$("start").addEventListener("click",startMonitoring);
+$("stop").addEventListener("click",stopMonitoring);
+
+$("reset").addEventListener("click",()=>{
+  stopMonitoring();
+
+  count=0;
+  values=[];
+  times=[];
+  baseline={x:0,y:0,z:0};
+
+  ["x","y","z","rms","freq"].forEach(id=>{
+    $(id).textContent="—";
+  });
+
+  $("samples").textContent="0";
+
+  drawGraph();
+
+  setStatus(
+    "READY",
+    "Place your tablet on a steady table.",
+    "#36d399"
+  );
+});
+
+drawGraph();
+</script>
+</body>
+</html>
